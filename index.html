@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Condominio Le Pleiadi - Analisi Consumi</title>
+    <title>Dashboard Condominio - Dinamica e Adattiva</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -40,6 +40,15 @@
         .header p {
             font-size: 1.1rem;
             opacity: 0.9;
+        }
+
+        .info-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            margin: 10px auto;
+            display: inline-block;
+            font-size: 0.9rem;
         }
 
         .controls {
@@ -112,7 +121,7 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
@@ -126,13 +135,13 @@
         }
 
         .stat-value {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             font-weight: bold;
             color: #667eea;
         }
 
         .stat-label {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: #666;
             margin-top: 5px;
         }
@@ -166,10 +175,6 @@
 
         .overview-charts.hidden {
             display: none;
-        }
-
-        .comparison-section {
-            margin-top: 30px;
         }
 
         .apartment-checkboxes {
@@ -215,13 +220,14 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         th, td {
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             border-bottom: 1px solid #eee;
+            white-space: nowrap;
         }
 
         th {
@@ -230,6 +236,7 @@
             font-weight: 600;
             position: sticky;
             top: 0;
+            font-size: 0.8rem;
         }
 
         tr:hover {
@@ -244,6 +251,24 @@
 
         .full-width {
             grid-column: 1 / -1;
+        }
+
+        .date-range-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+
+        .date-range-info h4 {
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+
+        .date-range-info p {
+            color: #424242;
+            font-size: 0.9rem;
         }
 
         @media (max-width: 768px) {
@@ -267,6 +292,11 @@
             .apartment-checkboxes {
                 grid-template-columns: 1fr;
             }
+
+            th, td {
+                padding: 8px;
+                font-size: 0.8rem;
+            }
         }
 
         .last-update {
@@ -276,33 +306,40 @@
             margin-top: 20px;
         }
 
-        .chart-legend {
+        .columns-detected {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4caf50;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .columns-detected h4 {
+            color: #2e7d32;
+            margin-bottom: 8px;
+        }
+
+        .columns-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 15px;
-            justify-content: center;
+            gap: 8px;
         }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.9rem;
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 3px;
-            border-radius: 2px;
+        .column-tag {
+            background: #4caf50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏢 Dashboard Condominio - Le Pleiadi</h1>
-            <p>Analisi Consumi Individuali</p>
+            <h1>🏢 Dashboard Consumi - Le Pleiadi</h1>
+            <p>Analisi dei consumi indvividuali e complessivi</p>
+            <div class="info-badge">✨ Aggiunge automaticamente nuove colonne quando le inserisci nel foglio</div>
         </div>
 
         <div class="controls">
@@ -312,14 +349,22 @@
             <button class="view-toggle" id="comparisonBtn" onclick="showComparison()">⚖️ Confronta Appartamenti</button>
         </div>
 
+        <!-- Informazioni Colonne Rilevate -->
+        <div class="columns-detected" id="columnsDetected" style="display: none;">
+            <h4>📅 Periodi Rilevati Automaticamente</h4>
+            <div class="columns-list" id="columnsList"></div>
+        </div>
+
         <!-- Vista Generale -->
         <div class="overview-charts" id="overviewCharts">
+            <div class="date-range-info" id="dateRangeInfo">
+                <h4>📊 Periodo di Analisi</h4>
+                <p id="dateRangeText">Caricamento...</p>
+            </div>
+            
             <div class="dashboard-grid">
-                <!-- Grafico Energia Totale -->
                 <div class="card">
-                    <div class="card-title">
-                        ⚡ Consumo Energia Totale
-                    </div>
+                    <div class="card-title">⚡ Consumo Energia Totale</div>
                     <div class="chart-container">
                         <canvas id="energiaChart"></canvas>
                     </div>
@@ -332,14 +377,15 @@
                             <div class="stat-value" id="energiaMedia">-</div>
                             <div class="stat-label">Media kWh</div>
                         </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="energiaPeriodi">-</div>
+                            <div class="stat-label">Periodi</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Grafico Acqua Totale -->
                 <div class="card">
-                    <div class="card-title">
-                        💧 Consumo Acqua Totale
-                    </div>
+                    <div class="card-title">💧 Consumo Acqua Totale</div>
                     <div class="chart-container">
                         <canvas id="acquaChart"></canvas>
                     </div>
@@ -352,6 +398,10 @@
                             <div class="stat-value" id="acquaMedia">-</div>
                             <div class="stat-label">Media Litri</div>
                         </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="acquaPeriodi">-</div>
+                            <div class="stat-label">Periodi</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -361,9 +411,7 @@
         <div class="individual-charts" id="individualCharts">
             <div class="dashboard-grid">
                 <div class="card full-width">
-                    <div class="card-title">
-                        🏠 Seleziona Appartamento
-                    </div>
+                    <div class="card-title">🏠 Seleziona Appartamento</div>
                     <div class="apartment-selector">
                         <select id="apartmentSelector" onchange="updateIndividualCharts()">
                             <option value="">-- Seleziona un appartamento --</option>
@@ -372,18 +420,14 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-title">
-                        ⚡ Consumo Energia Individuale
-                    </div>
+                    <div class="card-title">⚡ Consumo Energia Individuale</div>
                     <div class="chart-container large">
                         <canvas id="energiaIndividualChart"></canvas>
                     </div>
                 </div>
 
                 <div class="card">
-                    <div class="card-title">
-                        💧 Consumo Acqua Individuale
-                    </div>
+                    <div class="card-title">💧 Consumo Acqua Individuale</div>
                     <div class="chart-container large">
                         <canvas id="acquaIndividualChart"></canvas>
                     </div>
@@ -394,27 +438,19 @@
         <!-- Vista Confronto -->
         <div class="individual-charts" id="comparisonCharts">
             <div class="card full-width">
-                <div class="card-title">
-                    ⚖️ Confronta Appartamenti
-                </div>
-                <div class="apartment-checkboxes" id="apartmentCheckboxes">
-                    <!-- Checkboxes generati dinamicamente -->
-                </div>
+                <div class="card-title">⚖️ Confronta Appartamenti</div>
+                <div class="apartment-checkboxes" id="apartmentCheckboxes"></div>
                 
                 <div class="dashboard-grid">
                     <div class="card">
-                        <div class="card-title">
-                            ⚡ Confronto Energia
-                        </div>
+                        <div class="card-title">⚡ Confronto Energia</div>
                         <div class="chart-container large">
                             <canvas id="energiaComparisonChart"></canvas>
                         </div>
                     </div>
 
                     <div class="card">
-                        <div class="card-title">
-                            💧 Confronto Acqua
-                        </div>
+                        <div class="card-title">💧 Confronto Acqua</div>
                         <div class="chart-container large">
                             <canvas id="acquaComparisonChart"></canvas>
                         </div>
@@ -423,32 +459,16 @@
             </div>
         </div>
 
-        <!-- Tabella Dettagliata (sempre visibile) -->
+        <!-- Tabella Dettagliata (dinamica) -->
         <div class="card">
-            <div class="card-title">
-                📊 Dettaglio Letture per Appartamento
-            </div>
+            <div class="card-title">📊 Dettaglio Letture per Appartamento</div>
             <div class="table-container">
                 <table id="dataTable">
-                    <thead>
-                        <tr>
-                            <th>Appartamento</th>
-                            <th>Energia 15/10</th>
-                            <th>Acqua 15/10</th>
-                            <th>Energia 31/10</th>
-                            <th>Acqua 31/10</th>
-                            <th>Energia 15/11</th>
-                            <th>Acqua 15/11</th>
-                            <th>Energia 30/11</th>
-                            <th>Acqua 30/11</th>
-                            <th>Energia 15/12</th>
-                            <th>Acqua 15/12</th>
-                            <th>Energia 31/12</th>
-                            <th>Acqua 31/12</th>
-                        </tr>
+                    <thead id="tableHead">
+                        <!-- Header generato dinamicamente -->
                     </thead>
                     <tbody id="tableBody">
-                        <!-- I dati verranno inseriti qui dinamicamente -->
+                        <!-- Dati generati dinamicamente -->
                     </tbody>
                 </table>
             </div>
@@ -460,13 +480,15 @@
     </div>
 
     <script>
-        // ID del tuo Google Sheets
+        // Configurazione
         const SHEET_ID = '1xhiWyizJFv6Js8UwTmbWBiiHhKAMu6UPpueqQ8Ds6F8';
         const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 
+        // Variabili globali
         let energiaChart, acquaChart, energiaIndividualChart, acquaIndividualChart;
         let energiaComparisonChart, acquaComparisonChart;
         let apartmentsData = [];
+        let detectedColumns = { energia: [], acqua: [], dates: [] };
         let currentView = 'overview';
 
         // Colori per i grafici
@@ -476,136 +498,58 @@
             '#ff9a9e', '#fecfef', '#ffeaa7', '#74b9ff', '#fd79a8', '#fdcb6e'
         ];
 
-        // Inizializzazione dei grafici
+        // Inizializzazione grafici
         function initCharts() {
-            // Grafici Overview
-            const ctxEnergia = document.getElementById('energiaChart').getContext('2d');
-            const ctxAcqua = document.getElementById('acquaChart').getContext('2d');
-
-            energiaChart = new Chart(ctxEnergia, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Consumo Energia Totale (kWh)',
-                        data: [],
-                        borderColor: '#667eea',
-                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
-                        x: { grid: { color: '#f0f0f0' }}
-                    }
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
+                    x: { grid: { color: '#f0f0f0' }}
                 }
+            };
+
+            // Grafici Overview
+            energiaChart = new Chart(document.getElementById('energiaChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: { ...commonOptions, plugins: { legend: { display: false }}}
             });
 
-            acquaChart = new Chart(ctxAcqua, {
+            acquaChart = new Chart(document.getElementById('acquaChart').getContext('2d'), {
                 type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Consumo Acqua Totale (Litri)',
-                        data: [],
-                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                        borderColor: '#36a2eb',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false }},
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
-                        x: { grid: { color: '#f0f0f0' }}
-                    }
-                }
+                data: { labels: [], datasets: [] },
+                options: { ...commonOptions, plugins: { legend: { display: false }}}
             });
 
             // Grafici Individuali
-            const ctxEnergiaInd = document.getElementById('energiaIndividualChart').getContext('2d');
-            const ctxAcquaInd = document.getElementById('acquaIndividualChart').getContext('2d');
-
-            energiaIndividualChart = new Chart(ctxEnergiaInd, {
+            energiaIndividualChart = new Chart(document.getElementById('energiaIndividualChart').getContext('2d'), {
                 type: 'line',
                 data: { labels: [], datasets: [] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
-                        x: { grid: { color: '#f0f0f0' }}
-                    }
-                }
+                options: { ...commonOptions, plugins: { legend: { display: true, position: 'top' }}}
             });
 
-            acquaIndividualChart = new Chart(ctxAcquaInd, {
+            acquaIndividualChart = new Chart(document.getElementById('acquaIndividualChart').getContext('2d'), {
                 type: 'line',
                 data: { labels: [], datasets: [] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
-                        x: { grid: { color: '#f0f0f0' }}
-                    }
-                }
+                options: { ...commonOptions, plugins: { legend: { display: true, position: 'top' }}}
             });
 
             // Grafici Confronto
-            const ctxEnergiaComp = document.getElementById('energiaComparisonChart').getContext('2d');
-            const ctxAcquaComp = document.getElementById('acquaComparisonChart').getContext('2d');
-
-            energiaComparisonChart = new Chart(ctxEnergiaComp, {
+            energiaComparisonChart = new Chart(document.getElementById('energiaComparisonChart').getContext('2d'), {
                 type: 'line',
                 data: { labels: [], datasets: [] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
-                        x: { grid: { color: '#f0f0f0' }}
-                    }
-                }
+                options: { ...commonOptions, plugins: { legend: { display: true, position: 'top' }}}
             });
 
-            acquaComparisonChart = new Chart(ctxAcquaComp, {
+            acquaComparisonChart = new Chart(document.getElementById('acquaComparisonChart').getContext('2d'), {
                 type: 'line',
                 data: { labels: [], datasets: [] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f0f0f0' }},
-                        x: { grid: { color: '#f0f0f0' }}
-                    }
-                }
+                options: { ...commonOptions, plugins: { legend: { display: true, position: 'top' }}}
             });
         }
 
-        // Caricamento dati da Google Sheets
+        // Caricamento e analisi dinamica dei dati
         async function loadData() {
             try {
                 document.getElementById('lastUpdate').textContent = 'Caricamento...';
@@ -619,9 +563,16 @@
                 });
 
                 apartmentsData = data.data;
+                
+                // Analisi dinamica delle colonne
+                detectColumns(data.meta.fields);
+                
+                // Elaborazione dati
                 processData(apartmentsData);
                 populateApartmentSelector();
                 populateApartmentCheckboxes();
+                updateTable(apartmentsData);
+                
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleString('it-IT');
                 
             } catch (error) {
@@ -630,50 +581,183 @@
             }
         }
 
-        // Elaborazione dati per vista generale
-        function processData(data) {
-            if (data.length === 0) return;
-
-            const dates = ['15/10', '31/10', '15/11', '30/11', '15/12', '31/12'];
+        // Rilevamento automatico delle colonne
+        function detectColumns(fields) {
+            detectedColumns = { energia: [], acqua: [], dates: [] };
             
-            // Calcolo consumi totali per data
-            const energiaTotali = dates.map(date => {
-                const colonna = getColumnName('energia', date);
+            fields.forEach(field => {
+                // Pattern per energia: "Lettura Energia [data]"
+                if (field.includes('Lettura Energia') || field.includes('Energia')) {
+                    const dateMatch = extractDateFromColumn(field);
+                    if (dateMatch) {
+                        detectedColumns.energia.push({ column: field, date: dateMatch });
+                    }
+                }
+                
+                // Pattern per acqua: "Lettura Contalitri [data]" o varianti
+                if (field.includes('Lettura Contalitri') || field.includes('Contalitri') || 
+                    (field.includes('Acqua') && !field.includes('Energia'))) {
+                    const dateMatch = extractDateFromColumn(field);
+                    if (dateMatch) {
+                        detectedColumns.acqua.push({ column: field, date: dateMatch });
+                    }
+                }
+            });
+
+            // Estrazione e ordinamento delle date
+            const allDates = [...detectedColumns.energia, ...detectedColumns.acqua]
+                .map(item => item.date)
+                .filter((date, index, self) => self.indexOf(date) === index) // rimuovi duplicati
+                .sort((a, b) => parseDate(a) - parseDate(b)); // ordina cronologicamente
+
+            detectedColumns.dates = allDates;
+
+            // Riordina le colonne per data
+            detectedColumns.energia.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+            detectedColumns.acqua.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+
+            // Mostra le colonne rilevate
+            displayDetectedColumns();
+        }
+
+        // Estrazione data da nome colonna
+        function extractDateFromColumn(columnName) {
+            // Pattern comuni per le date
+            const patterns = [
+                /(\d{1,2})\s+(Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)/i,
+                /(\d{1,2})\/(\d{1,2})/,
+                /(\d{1,2})-(\d{1,2})/,
+                /(\d{1,2})\s+(\w{3})/i
+            ];
+
+            for (let pattern of patterns) {
+                const match = columnName.match(pattern);
+                if (match) {
+                    if (match[2] && isNaN(match[2])) {
+                        // Formato "15 Ottobre"
+                        return `${match[1]} ${match[2]}`;
+                    } else if (match[2] && !isNaN(match[2])) {
+                        // Formato "15/10" o "15-10"
+                        return `${match[1]}/${match[2]}`;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Parsing data per ordinamento
+        function parseDate(dateStr) {
+            const monthMap = {
+                'gennaio': 1, 'febbraio': 2, 'marzo': 3, 'aprile': 4, 'maggio': 5, 'giugno': 6,
+                'luglio': 7, 'agosto': 8, 'settembre': 9, 'ottobre': 10, 'novembre': 11, 'dicembre': 12
+            };
+
+            // Formato "15 Ottobre"
+            const monthMatch = dateStr.match(/(\d{1,2})\s+(\w+)/i);
+            if (monthMatch) {
+                const day = parseInt(monthMatch[1]);
+                const month = monthMap[monthMatch[2].toLowerCase()] || 1;
+                return new Date(2024, month - 1, day); // Assumiamo 2024 come anno di riferimento
+            }
+
+            // Formato "15/10"
+            const slashMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
+            if (slashMatch) {
+                const day = parseInt(slashMatch[1]);
+                const month = parseInt(slashMatch[2]);
+                return new Date(2024, month - 1, day);
+            }
+
+            return new Date();
+        }
+
+        // Visualizza colonne rilevate
+        function displayDetectedColumns() {
+            const container = document.getElementById('columnsDetected');
+            const list = document.getElementById('columnsList');
+            
+            if (detectedColumns.dates.length > 0) {
+                container.style.display = 'block';
+                list.innerHTML = detectedColumns.dates.map(date => 
+                    `<span class="column-tag">${date}</span>`
+                ).join('');
+
+                // Aggiorna info periodo
+                const dateRangeText = document.getElementById('dateRangeText');
+                const firstDate = detectedColumns.dates[0];
+                const lastDate = detectedColumns.dates[detectedColumns.dates.length - 1];
+                dateRangeText.textContent = `Dal ${firstDate} al ${lastDate} (${detectedColumns.dates.length} periodi rilevati)`;
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        // Elaborazione dati dinamica
+        function processData(data) {
+            if (data.length === 0 || detectedColumns.dates.length === 0) return;
+
+            // Calcolo consumi totali per ogni data rilevata
+            const energiaTotali = detectedColumns.dates.map(date => {
+                const energiaCol = detectedColumns.energia.find(col => col.date === date);
+                if (!energiaCol) return 0;
+                
                 return data.reduce((sum, row) => {
-                    const value = parseFloat(row[colonna]) || 0;
+                    const value = parseFloat(row[energiaCol.column]) || 0;
                     return sum + value;
                 }, 0);
             });
 
-            const acquaTotali = dates.map(date => {
-                const colonna = getColumnName('acqua', date);
+            const acquaTotali = detectedColumns.dates.map(date => {
+                const acquaCol = detectedColumns.acqua.find(col => col.date === date);
+                if (!acquaCol) return 0;
+                
                 return data.reduce((sum, row) => {
-                    const value = parseFloat(row[colonna]) || 0;
+                    const value = parseFloat(row[acquaCol.column]) || 0;
                     return sum + value;
                 }, 0);
             });
 
             // Aggiornamento grafici overview
-            energiaChart.data.labels = dates;
-            energiaChart.data.datasets[0].data = energiaTotali;
+            energiaChart.data.labels = detectedColumns.dates;
+            energiaChart.data.datasets = [{
+                label: 'Consumo Energia Totale (kWh)',
+                data: energiaTotali,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }];
             energiaChart.update();
 
-            acquaChart.data.labels = dates;
-            acquaChart.data.datasets[0].data = acquaTotali;
+            acquaChart.data.labels = detectedColumns.dates;
+            acquaChart.data.datasets = [{
+                label: 'Consumo Acqua Totale (Litri)',
+                data: acquaTotali,
+                backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                borderColor: '#36a2eb',
+                borderWidth: 2
+            }];
             acquaChart.update();
 
-            // Calcolo statistiche
+            // Calcolo e aggiornamento statistiche
+            updateStatistics(energiaTotali, acquaTotali);
+        }
+
+        // Aggiornamento statistiche
+        function updateStatistics(energiaTotali, acquaTotali) {
             const energiaTotale = energiaTotali.reduce((a, b) => a + b, 0);
             const acquaTotale = acquaTotali.reduce((a, b) => a + b, 0);
-            const energiaMedia = energiaTotale / energiaTotali.length;
-            const acquaMedia = acquaTotale / acquaTotali.length;
+            const energiaMedia = energiaTotali.length > 0 ? energiaTotale / energiaTotali.length : 0;
+            const acquaMedia = acquaTotali.length > 0 ? acquaTotale / acquaTotali.length : 0;
 
             document.getElementById('energiaTotale').textContent = energiaTotale.toLocaleString('it-IT', {maximumFractionDigits: 0});
             document.getElementById('energiaMedia').textContent = energiaMedia.toLocaleString('it-IT', {maximumFractionDigits: 1});
+            document.getElementById('energiaPeriodi').textContent = detectedColumns.dates.length;
+
             document.getElementById('acquaTotale').textContent = acquaTotale.toLocaleString('it-IT', {maximumFractionDigits: 0});
             document.getElementById('acquaMedia').textContent = acquaMedia.toLocaleString('it-IT', {maximumFractionDigits: 1});
-
-            updateTable(data);
+            document.getElementById('acquaPeriodi').textContent = detectedColumns.dates.length;
         }
 
         // Popola selector appartamenti
@@ -712,22 +796,20 @@
             const apartment = apartmentsData[selectedIndex];
             const apartmentName = apartment['Proprietario/i'] || apartment[Object.keys(apartment)[0]] || `Appartamento ${parseInt(selectedIndex) + 1}`;
             
-            const dates = ['15/10', '31/10', '15/11', '30/11', '15/12', '31/12'];
-            
             // Dati energia
-            const energiaData = dates.map(date => {
-                const colonna = getColumnName('energia', date);
-                return parseFloat(apartment[colonna]) || 0;
+            const energiaData = detectedColumns.dates.map(date => {
+                const energiaCol = detectedColumns.energia.find(col => col.date === date);
+                return energiaCol ? (parseFloat(apartment[energiaCol.column]) || 0) : 0;
             });
 
             // Dati acqua
-            const acquaData = dates.map(date => {
-                const colonna = getColumnName('acqua', date);
-                return parseFloat(apartment[colonna]) || 0;
+            const acquaData = detectedColumns.dates.map(date => {
+                const acquaCol = detectedColumns.acqua.find(col => col.date === date);
+                return acquaCol ? (parseFloat(apartment[acquaCol.column]) || 0) : 0;
             });
 
-            // Aggiorna grafico energia individuale
-            energiaIndividualChart.data.labels = dates;
+            // Aggiorna grafici
+            energiaIndividualChart.data.labels = detectedColumns.dates;
             energiaIndividualChart.data.datasets = [{
                 label: `${apartmentName} - Energia (kWh)`,
                 data: energiaData,
@@ -739,8 +821,7 @@
             }];
             energiaIndividualChart.update();
 
-            // Aggiorna grafico acqua individuale
-            acquaIndividualChart.data.labels = dates;
+            acquaIndividualChart.data.labels = detectedColumns.dates;
             acquaIndividualChart.data.datasets = [{
                 label: `${apartmentName} - Acqua (Litri)`,
                 data: acquaData,
@@ -766,16 +847,14 @@
                 return;
             }
 
-            const dates = ['15/10', '31/10', '15/11', '30/11', '15/12', '31/12'];
-            
             // Dataset per energia
             const energiaDatasets = selectedIndices.map((index, i) => {
                 const apartment = apartmentsData[index];
                 const apartmentName = apartment['Proprietario/i'] || apartment[Object.keys(apartment)[0]] || `Appartamento ${index + 1}`;
                 
-                const data = dates.map(date => {
-                    const colonna = getColumnName('energia', date);
-                    return parseFloat(apartment[colonna]) || 0;
+                const data = detectedColumns.dates.map(date => {
+                    const energiaCol = detectedColumns.energia.find(col => col.date === date);
+                    return energiaCol ? (parseFloat(apartment[energiaCol.column]) || 0) : 0;
                 });
 
                 return {
@@ -794,9 +873,9 @@
                 const apartment = apartmentsData[index];
                 const apartmentName = apartment['Proprietario/i'] || apartment[Object.keys(apartment)[0]] || `Appartamento ${index + 1}`;
                 
-                const data = dates.map(date => {
-                    const colonna = getColumnName('acqua', date);
-                    return parseFloat(apartment[colonna]) || 0;
+                const data = detectedColumns.dates.map(date => {
+                    const acquaCol = detectedColumns.acqua.find(col => col.date === date);
+                    return acquaCol ? (parseFloat(apartment[acquaCol.column]) || 0) : 0;
                 });
 
                 return {
@@ -811,28 +890,51 @@
             });
 
             // Aggiorna grafici
-            energiaComparisonChart.data.labels = dates;
+            energiaComparisonChart.data.labels = detectedColumns.dates;
             energiaComparisonChart.data.datasets = energiaDatasets;
             energiaComparisonChart.update();
 
-            acquaComparisonChart.data.labels = dates;
+            acquaComparisonChart.data.labels = detectedColumns.dates;
             acquaComparisonChart.data.datasets = acquaDatasets;
             acquaComparisonChart.update();
         }
 
-        // Utility per ottenere nome colonna
-        function getColumnName(type, date) {
-            const monthMap = {
-                '15/10': '15 Ottobre',
-                '31/10': '31 Ottobre',
-                '15/11': '15 Novembre',
-                '30/11': '30 Novembre',
-                '15/12': '15 Dicembre',
-                '31/12': '31 Dicembre'
-            };
+        // Aggiornamento tabella dinamica
+        function updateTable(data) {
+            const thead = document.getElementById('tableHead');
+            const tbody = document.getElementById('tableBody');
             
-            const prefix = type === 'energia' ? 'Lettura Energia' : 'Lettura Contalitri';
-            return `${prefix} ${monthMap[date]}`;
+            // Header dinamico
+            let headerHTML = '<tr><th>Appartamento</th>';
+            detectedColumns.dates.forEach(date => {
+                headerHTML += `<th>Energia ${date}</th><th>Acqua ${date}</th>`;
+            });
+            headerHTML += '</tr>';
+            thead.innerHTML = headerHTML;
+
+            // Body dinamico
+            tbody.innerHTML = '';
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                const appartamento = row['Proprietario/i'] || row[Object.keys(row)[0]] || 'N/A';
+                
+                let rowHTML = `<td><strong>${appartamento}</strong></td>`;
+                
+                detectedColumns.dates.forEach(date => {
+                    // Energia
+                    const energiaCol = detectedColumns.energia.find(col => col.date === date);
+                    const energiaValue = energiaCol ? (parseFloat(row[energiaCol.column]) || 0) : 0;
+                    
+                    // Acqua
+                    const acquaCol = detectedColumns.acqua.find(col => col.date === date);
+                    const acquaValue = acquaCol ? (parseFloat(row[acquaCol.column]) || 0) : 0;
+                    
+                    rowHTML += `<td>${energiaValue.toLocaleString('it-IT')}</td><td>${acquaValue.toLocaleString('it-IT')}</td>`;
+                });
+                
+                tr.innerHTML = rowHTML;
+                tbody.appendChild(tr);
+            });
         }
 
         // Controlli visualizzazione
@@ -867,35 +969,6 @@
             document.getElementById('overviewBtn').classList.remove('active');
             document.getElementById('individualBtn').classList.remove('active');
             document.getElementById('comparisonBtn').classList.add('active');
-        }
-
-        // Aggiornamento tabella dettagliata
-        function updateTable(data) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-
-            data.forEach(row => {
-                const tr = document.createElement('tr');
-                const appartamento = row['Proprietario/i'] || row[Object.keys(row)[0]] || 'N/A';
-                
-                tr.innerHTML = `
-                    <td><strong>${appartamento}</strong></td>
-                    <td>${(parseFloat(row['Lettura Energia 15 Ottobre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Contalitri 15 Ottobre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Energia 31 Ottobre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Contalitri 31 Ottobre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Energia 15 Novembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Contalitri 15 Novembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Energia 30 Novembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Contalitri 30 Novembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Energia 15 Dicembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Contalitri 15 Dicembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Energia 31 Dicembre']) || 0).toLocaleString('it-IT')}</td>
-                    <td>${(parseFloat(row['Lettura Contalitri 31 Dicembre']) || 0).toLocaleString('it-IT')}</td>
-                `;
-                
-                tbody.appendChild(tr);
-            });
         }
 
         // Inizializzazione
