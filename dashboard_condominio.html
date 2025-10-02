@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Condominio - Consumi Energia e Acqua</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .refresh-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s ease;
+            margin: 20px auto;
+            display: block;
+        }
+
+        .refresh-button:hover {
+            background: #5a6fd8;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            margin: 20px 0;
+        }
+
+        .icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+        }
+
+        .last-update {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 Dashboard Condominio</h1>
+            <p>Monitoraggio Consumi Energia e Acqua - Aggiornamento Automatico</p>
+        </div>
+
+        <button class="refresh-button" onclick="loadData()">🔄 Aggiorna Dati</button>
+
+        <div class="dashboard-grid">
+            <!-- Grafico Energia -->
+            <div class="card">
+                <div class="card-title">
+                    ⚡ Consumo Energia
+                </div>
+                <div class="chart-container">
+                    <canvas id="energiaChart"></canvas>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="energiaTotale">-</div>
+                        <div class="stat-label">Totale kWh</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="energiaMedia">-</div>
+                        <div class="stat-label">Media kWh</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grafico Acqua -->
+            <div class="card">
+                <div class="card-title">
+                    💧 Consumo Acqua
+                </div>
+                <div class="chart-container">
+                    <canvas id="acquaChart"></canvas>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="acquaTotale">-</div>
+                        <div class="stat-label">Totale Litri</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="acquaMedia">-</div>
+                        <div class="stat-label">Media Litri</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabella Dettagliata -->
+        <div class="card">
+            <div class="card-title">
+                📊 Dettaglio Letture per Appartamento
+            </div>
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>Appartamento</th>
+                            <th>Energia 15/10</th>
+                            <th>Acqua 15/10</th>
+                            <th>Energia 31/10</th>
+                            <th>Acqua 31/10</th>
+                            <th>Energia 15/11</th>
+                            <th>Acqua 15/11</th>
+                            <th>Energia 30/11</th>
+                            <th>Acqua 30/11</th>
+                            <th>Energia 15/12</th>
+                            <th>Acqua 15/12</th>
+                            <th>Energia 31/12</th>
+                            <th>Acqua 31/12</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- I dati verranno inseriti qui dinamicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="last-update">
+            Ultimo aggiornamento: <span id="lastUpdate">-</span>
+        </div>
+    </div>
+
+    <script>
+        // ID del tuo Google Sheets (estratto dall'URL)
+        const SHEET_ID = '1xhiWyizJFv6Js8UwTmbWBiiHhKAMu6UPpueqQ8Ds6F8';
+        
+        // URL per accedere ai dati in formato CSV
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+
+        let energiaChart, acquaChart;
+
+        // Inizializzazione dei grafici
+        function initCharts() {
+            const ctxEnergia = document.getElementById('energiaChart').getContext('2d');
+            const ctxAcqua = document.getElementById('acquaChart').getContext('2d');
+
+            energiaChart = new Chart(ctxEnergia, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Consumo Energia (kWh)',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#f0f0f0'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: '#f0f0f0'
+                            }
+                        }
+                    }
+                }
+            });
+
+            acquaChart = new Chart(ctxAcqua, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Consumo Acqua (Litri)',
+                        data: [],
+                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                        borderColor: '#36a2eb',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: '#f0f0f0'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: '#f0f0f0'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Caricamento dati da Google Sheets
+        async function loadData() {
+            try {
+                document.getElementById('lastUpdate').textContent = 'Caricamento...';
+                
+                const response = await fetch(CSV_URL);
+                const csvText = await response.text();
+                
+                const data = Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true
+                });
+
+                processData(data.data);
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleString('it-IT');
+                
+            } catch (error) {
+                console.error('Errore nel caricamento dei dati:', error);
+                alert('Errore nel caricamento dei dati. Verifica che il Google Sheets sia pubblico.');
+            }
+        }
+
+        // Elaborazione e visualizzazione dati
+        function processData(data) {
+            if (data.length === 0) return;
+
+            // Estrazione delle date dalle colonne
+            const dates = ['15/10', '31/10', '15/11', '30/11', '15/12', '31/12'];
+            
+            // Calcolo consumi totali per data
+            const energiaTotali = dates.map(date => {
+                const colonna = `Lettura Energia ${date === '15/10' ? '15 Ottobre' : 
+                                 date === '31/10' ? '31 Ottobre' : 
+                                 date === '15/11' ? '15 Novembre' : 
+                                 date === '30/11' ? '30 Novembre' : 
+                                 date === '15/12' ? '15 Dicembre' : '31 Dicembre'}`;
+                
+                return data.reduce((sum, row) => {
+                    const value = parseFloat(row[colonna]) || 0;
+                    return sum + value;
+                }, 0);
+            });
+
+            const acquaTotali = dates.map(date => {
+                const colonna = `Lettura Contalitri ${date === '15/10' ? '15 Ottobre' : 
+                                date === '31/10' ? '31 Ottobre' : 
+                                date === '15/11' ? '15 Novembre' : 
+                                date === '30/11' ? '30 Novembre' : 
+                                date === '15/12' ? '15 Dicembre' : '31 Dicembre'}`;
+                
+                return data.reduce((sum, row) => {
+                    const value = parseFloat(row[colonna]) || 0;
+                    return sum + value;
+                }, 0);
+            });
+
+            // Aggiornamento grafici
+            energiaChart.data.labels = dates;
+            energiaChart.data.datasets[0].data = energiaTotali;
+            energiaChart.update();
+
+            acquaChart.data.labels = dates;
+            acquaChart.data.datasets[0].data = acquaTotali;
+            acquaChart.update();
+
+            // Calcolo statistiche
+            const energiaTotale = energiaTotali.reduce((a, b) => a + b, 0);
+            const acquaTotale = acquaTotali.reduce((a, b) => a + b, 0);
+            const energiaMedia = energiaTotale / energiaTotali.length;
+            const acquaMedia = acquaTotale / acquaTotali.length;
+
+            document.getElementById('energiaTotale').textContent = energiaTotale.toLocaleString('it-IT', {maximumFractionDigits: 0});
+            document.getElementById('energiaMedia').textContent = energiaMedia.toLocaleString('it-IT', {maximumFractionDigits: 1});
+            document.getElementById('acquaTotale').textContent = acquaTotale.toLocaleString('it-IT', {maximumFractionDigits: 0});
+            document.getElementById('acquaMedia').textContent = acquaMedia.toLocaleString('it-IT', {maximumFractionDigits: 1});
+
+            // Popolamento tabella
+            updateTable(data);
+        }
+
+        // Aggiornamento tabella dettagliata
+        function updateTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                
+                // Estrazione del nome dell'appartamento/proprietario
+                const appartamento = row['Proprietario/i'] || row[Object.keys(row)[0]] || 'N/A';
+                
+                tr.innerHTML = `
+                    <td><strong>${appartamento}</strong></td>
+                    <td>${(parseFloat(row['Lettura Energia 15 Ottobre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Contalitri 15 Ottobre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Energia 31 Ottobre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Contalitri 31 Ottobre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Energia 15 Novembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Contalitri 15 Novembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Energia 30 Novembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Contalitri 30 Novembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Energia 15 Dicembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Contalitri 15 Dicembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Energia 31 Dicembre']) || 0).toLocaleString('it-IT')}</td>
+                    <td>${(parseFloat(row['Lettura Contalitri 31 Dicembre']) || 0).toLocaleString('it-IT')}</td>
+                `;
+                
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Inizializzazione al caricamento della pagina
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            loadData();
+            
+            // Aggiornamento automatico ogni 30 minuti
+            setInterval(loadData, 30 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>
