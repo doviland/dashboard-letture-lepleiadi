@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Condominio - Dinamica e Adattiva</title>
+    <title>Dashboard Condominio - Ordine Cronologico Inserimento</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
@@ -331,15 +331,40 @@
             padding: 4px 8px;
             border-radius: 12px;
             font-size: 0.8rem;
+            position: relative;
+        }
+
+        .column-tag.new {
+            background: #ff9800;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .insertion-order-info {
+            background: rgba(255, 152, 0, 0.1);
+            border: 1px solid #ff9800;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .insertion-order-info h4 {
+            color: #f57c00;
+            margin-bottom: 8px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏢 Dashboard Consumi - Le Pleiadi</h1>
-            <p>Analisi dei consumi indvividuali e complessivi</p>
-            <div class="info-badge">Aggiornamento In tempo Reale</div>
+            <h1>🏢 Dashboard Consumi Condominio Le Pleiadi</h1>
+            <p>Analisi Consumi Individuali e Collettivi</p>
+            <div class="info-badge">Dati aggiornati in tempo reale</div>
         </div>
 
         <div class="controls">
@@ -349,9 +374,15 @@
             <button class="view-toggle" id="comparisonBtn" onclick="showComparison()">⚖️ Confronta Appartamenti</button>
         </div>
 
+        <!-- Informazioni Ordine Inserimento -->
+        <div class="insertion-order-info">
+            <h4>📋 Ordine di Inserimento Colonne</h4>
+            <p>Le colonne vengono mantenute nell'ordine in cui appaiono nel foglio Google. Le nuove letture si aggiungono sempre alla fine della timeline, anche se il mese (es. Gennaio) alfabeticamente verrebbe prima.</p>
+        </div>
+
         <!-- Informazioni Colonne Rilevate -->
         <div class="columns-detected" id="columnsDetected" style="display: none;">
-            <h4>📅 Periodi Rilevati Automaticamente</h4>
+            <h4>📅 Periodi nell'Ordine di Inserimento</h4>
             <div class="columns-list" id="columnsList"></div>
         </div>
 
@@ -381,6 +412,10 @@
                             <div class="stat-value" id="energiaPeriodi">-</div>
                             <div class="stat-label">Periodi</div>
                         </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="energiaUltimo">-</div>
+                            <div class="stat-label">Ultimo</div>
+                        </div>
                     </div>
                 </div>
 
@@ -401,6 +436,10 @@
                         <div class="stat-item">
                             <div class="stat-value" id="acquaPeriodi">-</div>
                             <div class="stat-label">Periodi</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="acquaUltimo">-</div>
+                            <div class="stat-label">Ultimo</div>
                         </div>
                     </div>
                 </div>
@@ -490,6 +529,7 @@
         let apartmentsData = [];
         let detectedColumns = { energia: [], acqua: [], dates: [] };
         let currentView = 'overview';
+        let previousColumnCount = 0;
 
         // Colori per i grafici
         const colors = [
@@ -564,8 +604,8 @@
 
                 apartmentsData = data.data;
                 
-                // Analisi dinamica delle colonne
-                detectColumns(data.meta.fields);
+                // Analisi dinamica delle colonne MANTENENDO L'ORDINE DI INSERIMENTO
+                detectColumnsInOrder(data.meta.fields);
                 
                 // Elaborazione dati
                 processData(apartmentsData);
@@ -581,16 +621,25 @@
             }
         }
 
-        // Rilevamento automatico delle colonne
-        function detectColumns(fields) {
+        // Rilevamento colonne NELL'ORDINE DI INSERIMENTO
+        function detectColumnsInOrder(fields) {
+            const previousCount = detectedColumns.dates.length;
             detectedColumns = { energia: [], acqua: [], dates: [] };
             
-            fields.forEach(field => {
+            // Manteniamo l'ordine esatto delle colonne come appaiono nel CSV
+            const energiaColumns = [];
+            const acquaColumns = [];
+            
+            fields.forEach((field, index) => {
                 // Pattern per energia: "Lettura Energia [data]"
                 if (field.includes('Lettura Energia') || field.includes('Energia')) {
                     const dateMatch = extractDateFromColumn(field);
                     if (dateMatch) {
-                        detectedColumns.energia.push({ column: field, date: dateMatch });
+                        energiaColumns.push({ 
+                            column: field, 
+                            date: dateMatch, 
+                            order: index // Manteniamo l'ordine di inserimento
+                        });
                     }
                 }
                 
@@ -599,28 +648,39 @@
                     (field.includes('Acqua') && !field.includes('Energia'))) {
                     const dateMatch = extractDateFromColumn(field);
                     if (dateMatch) {
-                        detectedColumns.acqua.push({ column: field, date: dateMatch });
+                        acquaColumns.push({ 
+                            column: field, 
+                            date: dateMatch, 
+                            order: index // Manteniamo l'ordine di inserimento
+                        });
                     }
                 }
             });
 
-            // Estrazione e ordinamento delle date
-            const allDates = [...detectedColumns.energia, ...detectedColumns.acqua]
-                .map(item => item.date)
-                .filter((date, index, self) => self.indexOf(date) === index) // rimuovi duplicati
-                .sort((a, b) => parseDate(a) - parseDate(b)); // ordina cronologicamente
+            // Ordinamento per ordine di inserimento, NON cronologico
+            energiaColumns.sort((a, b) => a.order - b.order);
+            acquaColumns.sort((a, b) => a.order - b.order);
 
-            detectedColumns.dates = allDates;
+            detectedColumns.energia = energiaColumns;
+            detectedColumns.acqua = acquaColumns;
 
-            // Riordina le colonne per data
-            detectedColumns.energia.sort((a, b) => parseDate(a.date) - parseDate(b.date));
-            detectedColumns.acqua.sort((a, b) => parseDate(a.date) - parseDate(b.date));
+            // Estrazione delle date nell'ordine di inserimento
+            const datesByOrder = [];
+            energiaColumns.forEach(item => {
+                if (!datesByOrder.find(d => d.date === item.date)) {
+                    datesByOrder.push({ date: item.date, order: item.order });
+                }
+            });
+            
+            // Ordinamento per ordine di inserimento
+            datesByOrder.sort((a, b) => a.order - b.order);
+            detectedColumns.dates = datesByOrder.map(item => item.date);
 
             // Mostra le colonne rilevate
-            displayDetectedColumns();
+            displayDetectedColumns(detectedColumns.dates.length > previousCount);
         }
 
-        // Estrazione data da nome colonna
+        // Estrazione data da nome colonna (semplificata)
         function extractDateFromColumn(columnName) {
             // Pattern comuni per le date
             const patterns = [
@@ -645,58 +705,33 @@
             return null;
         }
 
-        // Parsing data per ordinamento
-        function parseDate(dateStr) {
-            const monthMap = {
-                'gennaio': 1, 'febbraio': 2, 'marzo': 3, 'aprile': 4, 'maggio': 5, 'giugno': 6,
-                'luglio': 7, 'agosto': 8, 'settembre': 9, 'ottobre': 10, 'novembre': 11, 'dicembre': 12
-            };
-
-            // Formato "15 Ottobre"
-            const monthMatch = dateStr.match(/(\d{1,2})\s+(\w+)/i);
-            if (monthMatch) {
-                const day = parseInt(monthMatch[1]);
-                const month = monthMap[monthMatch[2].toLowerCase()] || 1;
-                return new Date(2024, month - 1, day); // Assumiamo 2024 come anno di riferimento
-            }
-
-            // Formato "15/10"
-            const slashMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
-            if (slashMatch) {
-                const day = parseInt(slashMatch[1]);
-                const month = parseInt(slashMatch[2]);
-                return new Date(2024, month - 1, day);
-            }
-
-            return new Date();
-        }
-
-        // Visualizza colonne rilevate
-        function displayDetectedColumns() {
+        // Visualizza colonne rilevate con indicazione nuove
+        function displayDetectedColumns(hasNewColumns) {
             const container = document.getElementById('columnsDetected');
             const list = document.getElementById('columnsList');
             
             if (detectedColumns.dates.length > 0) {
                 container.style.display = 'block';
-                list.innerHTML = detectedColumns.dates.map(date => 
-                    `<span class="column-tag">${date}</span>`
-                ).join('');
+                list.innerHTML = detectedColumns.dates.map((date, index) => {
+                    const isNew = hasNewColumns && index >= (detectedColumns.dates.length - (hasNewColumns ? 1 : 0));
+                    return `<span class="column-tag ${isNew ? 'new' : ''}">${date}${isNew ? ' 🆕' : ''}</span>`;
+                }).join('');
 
                 // Aggiorna info periodo
                 const dateRangeText = document.getElementById('dateRangeText');
                 const firstDate = detectedColumns.dates[0];
                 const lastDate = detectedColumns.dates[detectedColumns.dates.length - 1];
-                dateRangeText.textContent = `Dal ${firstDate} al ${lastDate} (${detectedColumns.dates.length} periodi rilevati)`;
+                dateRangeText.textContent = `Dal ${firstDate} al ${lastDate} (${detectedColumns.dates.length} periodi nell'ordine di inserimento)`;
             } else {
                 container.style.display = 'none';
             }
         }
 
-        // Elaborazione dati dinamica
+        // Elaborazione dati rispettando l'ordine di inserimento
         function processData(data) {
             if (data.length === 0 || detectedColumns.dates.length === 0) return;
 
-            // Calcolo consumi totali per ogni data rilevata
+            // Calcolo consumi totali per ogni data NELL'ORDINE DI INSERIMENTO
             const energiaTotali = detectedColumns.dates.map(date => {
                 const energiaCol = detectedColumns.energia.find(col => col.date === date);
                 if (!energiaCol) return 0;
@@ -744,20 +779,26 @@
             updateStatistics(energiaTotali, acquaTotali);
         }
 
-        // Aggiornamento statistiche
+        // Aggiornamento statistiche con ultimo valore
         function updateStatistics(energiaTotali, acquaTotali) {
             const energiaTotale = energiaTotali.reduce((a, b) => a + b, 0);
             const acquaTotale = acquaTotali.reduce((a, b) => a + b, 0);
             const energiaMedia = energiaTotali.length > 0 ? energiaTotale / energiaTotali.length : 0;
             const acquaMedia = acquaTotali.length > 0 ? acquaTotale / acquaTotali.length : 0;
+            
+            // Ultimo valore (più recente)
+            const ultimoEnergia = energiaTotali.length > 0 ? energiaTotali[energiaTotali.length - 1] : 0;
+            const ultimoAcqua = acquaTotali.length > 0 ? acquaTotali[acquaTotali.length - 1] : 0;
 
             document.getElementById('energiaTotale').textContent = energiaTotale.toLocaleString('it-IT', {maximumFractionDigits: 0});
             document.getElementById('energiaMedia').textContent = energiaMedia.toLocaleString('it-IT', {maximumFractionDigits: 1});
             document.getElementById('energiaPeriodi').textContent = detectedColumns.dates.length;
+            document.getElementById('energiaUltimo').textContent = ultimoEnergia.toLocaleString('it-IT', {maximumFractionDigits: 0});
 
             document.getElementById('acquaTotale').textContent = acquaTotale.toLocaleString('it-IT', {maximumFractionDigits: 0});
             document.getElementById('acquaMedia').textContent = acquaMedia.toLocaleString('it-IT', {maximumFractionDigits: 1});
             document.getElementById('acquaPeriodi').textContent = detectedColumns.dates.length;
+            document.getElementById('acquaUltimo').textContent = ultimoAcqua.toLocaleString('it-IT', {maximumFractionDigits: 0});
         }
 
         // Popola selector appartamenti
@@ -796,13 +837,13 @@
             const apartment = apartmentsData[selectedIndex];
             const apartmentName = apartment['Proprietario/i'] || apartment[Object.keys(apartment)[0]] || `Appartamento ${parseInt(selectedIndex) + 1}`;
             
-            // Dati energia
+            // Dati energia nell'ordine di inserimento
             const energiaData = detectedColumns.dates.map(date => {
                 const energiaCol = detectedColumns.energia.find(col => col.date === date);
                 return energiaCol ? (parseFloat(apartment[energiaCol.column]) || 0) : 0;
             });
 
-            // Dati acqua
+            // Dati acqua nell'ordine di inserimento
             const acquaData = detectedColumns.dates.map(date => {
                 const acquaCol = detectedColumns.acqua.find(col => col.date === date);
                 return acquaCol ? (parseFloat(apartment[acquaCol.column]) || 0) : 0;
@@ -899,12 +940,12 @@
             acquaComparisonChart.update();
         }
 
-        // Aggiornamento tabella dinamica
+        // Aggiornamento tabella dinamica nell'ordine di inserimento
         function updateTable(data) {
             const thead = document.getElementById('tableHead');
             const tbody = document.getElementById('tableBody');
             
-            // Header dinamico
+            // Header dinamico nell'ordine di inserimento
             let headerHTML = '<tr><th>Appartamento</th>';
             detectedColumns.dates.forEach(date => {
                 headerHTML += `<th>Energia ${date}</th><th>Acqua ${date}</th>`;
